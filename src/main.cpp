@@ -1,206 +1,221 @@
-#include "tabela.hpp"
-#include "disco.hpp"
-#include "ordenacao_externa.hpp"
-#include "sort_merge_join.hpp"
-#include "csv_loader.hpp"
-
 #include <iostream>
-#include <iomanip>
+#include <fstream>
+#include <sstream>
 #include <string>
-#include <limits>
+#include "Esquema.hpp"
+#include "Tabela.hpp"
+#include "Tupla.hpp"
+#include "SortMergeJoin.hpp"
 
-// Imprime todas as tuplas de uma tabela no stdout, paginando a cada 12 linhas
-// Imprime todas as tuplas de uma tabela no stdout, ocultando 'grape_synonym' e paginando
-// Imprime todas as tuplas de uma tabela no stdout, ocultando 'grape_synonym' e paginando
-static void imprimir_tabela(const Tabela &tab, const std::string &titulo)
+#define ANSI_COLOR_CYAN "\x1b[36m"
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_RESET "\x1b[0m"
+#define PATH_GRAPE "../data/grapes.csv"
+#define PATH_WINE "../data/wines.csv"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
+void divider()
 {
-    std::cout << "\n=== " << titulo << " ===\n";
+    std::cout << "--------------------------------------------------------" << std::endl;
+}
 
-    // Cabeçalho (Pula se o nome for exatamente "grape_synonym")
-    int qtd_cols_visiveis = 0;
-    for (int i = 0; i < tab.esquema.qtd_cols(); i++)
+void title(const std::string &text)
+{
+    divider();
+    std::cout << ANSI_COLOR_CYAN << text << ANSI_COLOR_RESET << std::endl;
+    divider();
+}
+
+// Exibe o menu e retorna os índices das colunas escolhidas pelo usuário
+std::vector<int> escolherColunas(const Esquema &esq)
+{
+    int qtd = esq.getQtdColunas();
+
+    std::cout << "Colunas disponíveis:" << std::endl;
+    for (int i = 0; i < qtd; i++)
+        std::cout << "  [" << i << "] " << esq.getNomeDaColuna(i) << std::endl;
+
+    std::cout << "Digite os índices separados por espaço (ex: 0 1 3): ";
+
+    std::vector<int> escolhas;
+    std::string linha;
+    std::getline(std::cin, linha);
+    std::istringstream ss(linha);
+
+    int idx;
+    while (ss >> idx)
     {
-        if (tab.esquema.nomes[i] == "grape_synonym")
-            continue; // Pula o dado se a coluna for o sinônimo
-
-        if (tab.esquema.nomes[i] == "grape_country")
-            continue; // Pula o dado se a coluna for o país
-
-        if (tab.esquema.nomes[i] == "origem")
-            continue;
-
-        if (tab.esquema.nomes[i] == "tipo")
-            continue;
-
-        if (tab.esquema.nomes[i] == "estilo")
-            continue;
-
-        std::cout << std::setw(18) << std::left << tab.esquema.nomes[i] << " ";
-        qtd_cols_visiveis++;
+        if (idx >= 0 && idx < qtd)
+            escolhas.push_back(idx);
+        else
+            std::cout << "Índice " << idx << " ignorado (fora do intervalo)." << std::endl;
     }
-    std::cout << "\n";
 
-    // Ajusta o tamanho da linha separadora dinamicamente
-    std::cout << std::string(qtd_cols_visiveis * 19, '-') << "\n";
+    return escolhas;
+}
 
-    // Tuplas com Paginação
-    int total = 0;
-    for (int p = 0; p < tab.qtd_pags(); p++)
+// Exibe o resultado com índice visual e apenas as colunas escolhidas
+void exibirResultado(const Tabela *tabela, const std::vector<int> &colunasExibir)
+{
+    int idx = 1;
+    for (const auto &pag : tabela->fetchPages())
     {
-        const Pagina &pag = tab.ler_pagina(p);
-        for (int t = 0; t < pag.qtd_ocup; t++)
+        for (const auto &tup : pag.fetchAll())
         {
-            // Loop pelas colunas da tupla baseando-se no nome do esquema correspondente
-            for (int i = 0; i < tab.esquema.qtd_cols(); i++)
-            {
-                if (tab.esquema.nomes[i] == "grape_synonym")
-                    continue; // Pula o dado se a coluna for o sinônimo
-
-                if (tab.esquema.nomes[i] == "grape_country")
-                    continue; // Pula o dado se a coluna for o país
-
-                if (tab.esquema.nomes[i] == "origem")
-                    continue;
-
-                if (tab.esquema.nomes[i] == "tipo")
-                    continue;
-
-                if (tab.esquema.nomes[i] == "estilo")
-                    continue;
-
-                // Garante que o índice exista na tupla atual antes de tentar ler
-                if (i < static_cast<int>(pag.tuplas[t].cols.size()))
-                {
-                    std::cout << std::setw(18) << std::left << pag.tuplas[t].cols[i] << " ";
-                }
-            }
-            std::cout << "\n";
-            total++;
-
-            // Pausa a cada página de banco cheia (12 tuplas)
-            if (total % 12 == 0)
-            {
-                std::cout << "\n[Pressione ENTER para ver a proxima pagina...]";
-                std::cin.get();
-            }
+            std::cout << idx++;
+            for (int col : colunasExibir)
+                std::cout << " | " << tup.get(col);
+            std::cout << std::endl;
         }
     }
-    std::cout << "\nTotal: " << total << " tupla(s) em "
-              << tab.qtd_pags() << " pagina(s).\n";
+}
+
+// Função para ler linhas de CSV ignorando vírgulas dentro de aspas
+std::vector<std::string> parseCSVLine(const std::string &linha)
+{
+    std::vector<std::string> colunas;
+    std::string valorAtual = "";
+    bool dentroDeAspas = false;
+
+    for (size_t i = 0; i < linha.length(); ++i)
+    {
+        char c = linha[i];
+
+        if (c == '"')
+        {
+            dentroDeAspas = !dentroDeAspas; // Alterna o estado ao encontrar aspas
+        }
+        else if (c == ',' && !dentroDeAspas)
+        {
+            colunas.push_back(valorAtual);
+            valorAtual = "";
+        }
+        else
+        {
+            valorAtual += c;
+        }
+    }
+    colunas.push_back(valorAtual); // Adiciona a última coluna da linha
+    return colunas;
+}
+
+// Função auxiliar para limpar a string (remover espaços, \r, \n e aspas extras)
+std::string trim(const std::string &str)
+{
+    // Procura o primeiro caractere que NÃO seja espaço, tab, \r, \n ou aspas
+    size_t first = str.find_first_not_of(" \t\r\n\"");
+    if (first == std::string::npos)
+        return ""; // Retorna vazio se a string for só sujeira
+
+    // Procura o último caractere válido
+    size_t last = str.find_last_not_of(" \t\r\n\"");
+
+    return str.substr(first, (last - first + 1));
+}
+
+// Função auxiliar de E/S no main para ler os arquivos CSV
+bool carregarDeCSV(const std::string &caminhoArquivo, Tabela *tabela)
+{
+    std::ifstream arquivo(caminhoArquivo);
+
+    if (!arquivo.is_open())
+    {
+        std::cout << ANSI_COLOR_RED << "Erro ao abrir o arquivo: " << caminhoArquivo << ANSI_COLOR_RESET << std::endl;
+        return false;
+    }
+
+    std::string linha;
+
+    // Lê e descarta a primeira linha (cabeçalho das colunas)
+    std::getline(arquivo, linha);
+
+    int totalCarregado = 0;
+
+    while (std::getline(arquivo, linha))
+    {
+        if (linha.empty())
+            continue; // Pula linhas em branco
+
+        std::vector<std::string> colunas = parseCSVLine(linha);
+        Tupla tupla;
+
+        // Limpa e adiciona todas as colunas processadas na tupla
+        for (const std::string &valor : colunas)
+        {
+            tupla.add(trim(valor));
+        }
+
+        tabela->add(tupla);
+        totalCarregado++;
+    }
+
+    arquivo.close();
+    std::cout << "Arquivo '" << caminhoArquivo << "' carregado. Total de tuplas: " << totalCarregado << std::endl;
+    return true;
 }
 
 int main()
 {
-    std::cout << "==================================================\n";
-    std::cout << "         SGBD SIMULADO - CLI DE INTERVALOS        \n";
-    std::cout << "==================================================\n\n";
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+#endif
+    title("Trabalho 03 - SGBD");
 
-    // Intervalo padrão amplo (lê tudo por padrão)
-    long long id_inicio = 0;
-    long long id_fim = 999999;
-    std::string entrada;
+    // 1. Definição dos Esquemas
+    Esquema esquemaGrapes;
+    esquemaGrapes.add("chave_primaria");
+    esquemaGrapes.add("grape_synonym");
+    esquemaGrapes.add("grape_country");
 
-    std::cout << "-> Digite o ID INICIAL desejado (ou pressione ENTER para o padrao 0): ";
-    std::getline(std::cin, entrada);
-    if (!entrada.empty())
+    Esquema esquemaWines;
+    esquemaWines.add("vinho");
+    esquemaWines.add("chave_estrangeira");
+    esquemaWines.add("origem");
+    esquemaWines.add("tipo");
+    esquemaWines.add("estilo");
+
+    Tabela *grapes = new Tabela(esquemaGrapes);
+    Tabela *wines = new Tabela(esquemaWines);
+
+    std::cout << "Lendo arquivos de dados..." << std::endl;
+    bool sucessoGrapes = carregarDeCSV(PATH_GRAPE, grapes);
+    bool sucessoWines = carregarDeCSV(PATH_WINE, wines);
+
+    if (!sucessoGrapes || !sucessoWines)
     {
-        try
-        {
-            id_inicio = std::stoll(entrada);
-        }
-        catch (...)
-        {
-        }
-    }
-
-    std::cout << "-> Digite o ID FINAL desejado (ou pressione ENTER para o padrao total/40): ";
-    std::getline(std::cin, entrada);
-    if (!entrada.empty())
-    {
-        try
-        {
-            id_fim = std::stoll(entrada);
-        }
-        catch (...)
-        {
-        }
-    }
-    else
-    {
-        id_fim = 40; // O tamanho real de uvas detetado no ficheiro TAB
-    }
-
-    // ADICIONE ESTA LINHA BEM AQUI PARA LIMPAR O BUFFER:
-    if (std::cin.rdbuf()->in_avail() > 0) {
-        std::cin.ignore();
-    }
-
-    std::cout << "\n==================================================\n";
-    std::cout << "Processando intervalo de IDs de Grapes: [" << id_inicio << " ate " << id_fim << "]\n";
-    std::cout << "==================================================\n\n";
-
-    // -------------------------------------------------------------------------
-    // 1. Carrega as tabelas a partir dos arquivos CSV aplicando o filtro.
-    // -------------------------------------------------------------------------
-    std::cout << "Carregando tabelas...\n";
-
-    // Passamos os limites coletados na CLI para o CsvLoader
-    Tabela grapes = CsvLoader::carregar("../data/grapes.csv", id_inicio, id_fim);
-    Tabela wines = CsvLoader::carregar("../data/wines.csv", id_inicio, id_fim);
-
-    std::cout << "Grapes filtradas: " << grapes.qtd_tuplas() << " tupla(s) em "
-              << grapes.qtd_pags() << " pagina(s).\n";
-    std::cout << "Wines filtrados:  " << wines.qtd_tuplas() << " tupla(s) em "
-              << wines.qtd_pags() << " pagina(s).\n";
-
-    if (grapes.qtd_tuplas() == 0)
-    {
-        std::cout << "\nNenhuma tupla encontrada no intervalo selecionado. Encerrando.\n";
-        return 0;
-    }
-
-    // Índices das colunas de junção em cada tabela.
-    int col_grapes = grapes.esquema.indice("chave_primaria");
-    int col_wines = wines.esquema.indice("chave_estrangeira");
-
-    if (col_grapes == -1 || col_wines == -1)
-    {
-        std::cerr << "ERRO: coluna de juncao nao encontrada no esquema.\n";
+        std::cout << ANSI_COLOR_RED << "Encerrando execução devido a erro de leitura dos arquivos." << ANSI_COLOR_RESET << std::endl;
+        delete grapes;
+        delete wines;
         return 1;
     }
 
-    // -------------------------------------------------------------------------
-    // 2. Disco simulado e ordenação externa de cada tabela.
-    // -------------------------------------------------------------------------
-    std::cout << "\n--- Ordenacao Externa ---\n";
-    Disco disco;
+    // 3. Execução do Operador Sort-Merge Join
+    title("Executando Operação de Junção...");
+    SortMergeJoin *smj = new SortMergeJoin(grapes, wines, "chave_primaria", "chave_estrangeira");
+    smj->execute();
 
-    OrdenacaoExterna sorter(disco);
-    std::string run_grapes = sorter.ordenar(grapes, col_grapes, "grapes");
-    std::string run_wines = sorter.ordenar(wines, col_wines, "wines");
+    Tabela *resultado = smj->getResult();
 
-    // -------------------------------------------------------------------------
-    // 3. Sort-Merge Join sobre as runs ordenadas.
-    // -------------------------------------------------------------------------
-    std::cout << "\n--- Sort-Merge Join ---\n";
-    SortMergeJoin smj(disco);
-    Tabela resultado = smj.executar(
-        run_grapes,
-        run_wines,
-        grapes.esquema,
-        wines.esquema,
-        col_grapes,
-        col_wines);
+    // 4. Exibição dos Resultados
+    title("Resultado do Sort-Merge Join");
 
-    // -------------------------------------------------------------------------
-    // 4. Exibe o resultado.
-    // -------------------------------------------------------------------------
-    imprimir_tabela(resultado, "Resultado do Sort-Merge Join");
+    std::vector<int> colunas = escolherColunas(resultado->getEsquema());
+    exibirResultado(resultado, colunas);
 
-    // ADICIONE ESTAS LINHAS AQUI:
-    std::cout << "\n==================================================\n";
-    std::cout << "Programa finalizado. Pressione ENTER para sair...";
-    std::cin.get(); // Aguarda o utilizador pressionar Enter antes de fechar
+    std::cout << std::endl;
+    int totalTuplas = 0;
+    for (const auto &pag : resultado->fetchPages())
+        totalTuplas += pag.getQtdTuplas();
+
+    std::cout << "Total de tuplas no resultado: " << totalTuplas << std::endl;
+
+    // 5. Limpeza de Memória (Explicita conforme o guia de estilo)
+    delete smj;
+    delete grapes;
+    delete wines;
 
     return 0;
 }

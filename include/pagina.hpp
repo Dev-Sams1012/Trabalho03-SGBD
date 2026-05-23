@@ -1,24 +1,22 @@
-#pragma once
+#ifndef PAGINA_HPP
+#define PAGINA_HPP
 
-#include "tupla.hpp"
-#include <array>
+#include "Tupla.hpp"
+#include <vector>
 
-// Número fixo de tuplas por página, conforme especificação do trabalho.
-constexpr int TUPLAS_POR_PAGINA = 12;
-
-// Representa uma página do disco simulado.
-// Contém um array fixo de tuplas e um contador de posições ocupadas.
 class Pagina
 {
+private:
+    std::vector<Tupla> tuplas;
+    int qtdTuplasOcupadas;
+
 public:
-    std::array<Tupla, TUPLAS_POR_PAGINA> tuplas;
-    int qtd_ocup;
+    Pagina() : qtdTuplasOcupadas(0) {}
 
-    Pagina();
-
-    bool cheia() const;
-    bool vazia() const;
-
-    void inserir(const Tupla &t);
-    void limpar();
+    bool add(const Tupla &tuple);
+    std::vector<Tupla> fetchAll() const { return tuplas; }
+    int getQtdTuplas() const { return qtdTuplasOcupadas; }
+    bool isFull() const { return qtdTuplasOcupadas >= 12; }
 };
+
+#endif

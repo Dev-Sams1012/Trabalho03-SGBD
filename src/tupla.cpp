@@ -1,18 +1,15 @@
-#include "tupla.hpp"
+#include "Tupla.hpp"
+#include <iostream>
 
-Tupla::Tupla(int qtd_cols) : cols(qtd_cols) {}
-
-const std::string &Tupla::get(int idx) const
+void Tupla::display() const
 {
-    return cols[idx];
-}
-
-void Tupla::set(int idx, const std::string &val)
-{
-    cols[idx] = val;
-}
-
-bool Tupla::vazia() const
-{
-    return cols.empty();
+    for (size_t i = 0; i < colunas.size(); ++i)
+    {
+        std::cout << colunas[i];
+        if (i < colunas.size() - 1)
+        {
+            std::cout << " | ";
+        }
+    }
+    std::cout << std::endl;
 }

@@ -1,28 +1,26 @@
-#pragma once
+#ifndef TABELA_HPP
+#define TABELA_HPP
 
-#include "esquema.hpp"
-#include "pagina.hpp"
+#include "Pagina.hpp"
+#include "Esquema.hpp"
 #include <vector>
 
-// Representa uma tabela em memória como uma lista de páginas.
-// O Esquema é mantido por valor — sem ponteiros.
 class Tabela
 {
-public:
-    Esquema esquema;
+private:
     std::vector<Pagina> pags;
+    int qtdPags;
+    Esquema esquemaTabela;
 
-    Tabela(const Esquema &esq);
+public:
+    Tabela(const Esquema &schema) : qtdPags(0), esquemaTabela(schema) {}
 
-    int qtd_pags() const;
-    int qtd_tuplas() const;
+    void add(const Pagina &page);
+    void add(const Tupla &tuple);
 
-    const Pagina &ler_pagina(int idx) const;
-    Pagina &pagina(int idx);
-
-    void adicionar_pagina(const Pagina &p);
-
-    // Insere uma tupla na última página disponível,
-    // criando uma nova página automaticamente se necessário.
-    void inserir_tupla(const Tupla &t);
+    std::vector<Pagina> fetchPages() const { return pags; }
+    Esquema getEsquema() const { return esquemaTabela; }
+    int getQtdPags() const { return qtdPags; }
 };
+
+#endif

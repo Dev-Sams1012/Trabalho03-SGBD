@@ -1,18 +1,23 @@
-#include "esquema.hpp"
+#include "Esquema.hpp"
 
-Esquema::Esquema(const std::vector<std::string> &cols) : nomes(cols) {}
-
-int Esquema::indice(const std::string &nome) const
+void Esquema::add(const std::string &columnName)
 {
-    for (int i = 0; i < (int)nomes.size(); i++)
-    {
-        if (nomes[i] == nome)
-            return i;
-    }
-    return -1;
+    nomeParaIndice[columnName] = qtdColunas;
+    indiceparaNome.push_back(columnName);
+    qtdColunas++;
 }
 
-int Esquema::qtd_cols() const
+std::string Esquema::getNomeDaColuna(int index) const
 {
-    return (int)nomes.size();
+    return indiceparaNome[index];
+}
+
+int Esquema::getIndiceDaColuna(const std::string &columnName) const
+{
+    auto it = nomeParaIndice.find(columnName);
+    if (it != nomeParaIndice.end())
+    {
+        return it->second;
+    }
+    return -1;
 }

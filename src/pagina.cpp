@@ -1,23 +1,10 @@
-#include "pagina.hpp"
+#include "Pagina.hpp"
 
-Pagina::Pagina() : qtd_ocup(0) {}
-
-bool Pagina::cheia() const
+bool Pagina::add(const Tupla &tuple)
 {
-    return qtd_ocup == TUPLAS_POR_PAGINA;
-}
-
-bool Pagina::vazia() const
-{
-    return qtd_ocup == 0;
-}
-
-void Pagina::inserir(const Tupla &t)
-{
-    tuplas[qtd_ocup++] = t;
-}
-
-void Pagina::limpar()
-{
-    qtd_ocup = 0;
+    if (isFull())
+        return false;
+    tuplas.push_back(tuple);
+    qtdTuplasOcupadas++;
+    return true;
 }
