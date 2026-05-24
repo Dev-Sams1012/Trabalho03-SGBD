@@ -19,6 +19,7 @@ public:
     void add(const Tupla &tuple);
 
     std::vector<Pagina> fetchPages() const { return pags; }
+    const Pagina &fetchPage(int idx) const { return pags.at(idx); }
     Esquema getEsquema() const { return esquemaTabela; }
     int getQtdPags() const { return qtdPags; }
 };
