@@ -4,24 +4,22 @@
 
 struct PageCursor
 {
-    std::vector<Pagina> paginas;
-    size_t pagIdx = 0;
+    const Tabela *tabela;
+    int pagIdx;
     std::vector<Tupla> bufferTuplas;
-    size_t tuplaIdx = 0;
+    size_t tuplaIdx;
 
-    PageCursor(const Tabela *tabela)
+    explicit PageCursor(const Tabela *t) : tabela(t), pagIdx(0), tuplaIdx(0)
     {
-        paginas = tabela->fetchPages();
         carregarPagina();
     }
 
     void carregarPagina()
     {
-        if (pagIdx < paginas.size())
+        if (pagIdx < tabela->getQtdPags())
         {
-            bufferTuplas = paginas[pagIdx].fetchAll();
+            bufferTuplas = tabela->fetchPage(pagIdx).fetchAll();
             tuplaIdx = 0;
-            pagIdx++;
         }
         else
         {
@@ -31,7 +29,7 @@ struct PageCursor
 
     bool temMais() const
     {
-        return !bufferTuplas.empty() || pagIdx < paginas.size();
+        return !bufferTuplas.empty();
     }
 
     const Tupla &getCurrent() const
@@ -44,6 +42,7 @@ struct PageCursor
         tuplaIdx++;
         if (tuplaIdx >= bufferTuplas.size())
         {
+            pagIdx++;
             carregarPagina();
         }
     }
