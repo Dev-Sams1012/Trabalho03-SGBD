@@ -124,7 +124,6 @@ Tabela SortMergeJoin::mergeRuns(std::vector<Tabela> &runs, int colIndex, Esquema
     const int MAX_INPUT_BUFFERS = 4;
 
     std::vector<Tabela> currentRuns = runs;
-    int passNumber = 0;
 
     // Enquanto houver mais de 1 run, continuar intercalando
     while (currentRuns.size() > 1)
@@ -148,7 +147,6 @@ Tabela SortMergeJoin::mergeRuns(std::vector<Tabela> &runs, int colIndex, Esquema
         }
 
         currentRuns = nextRuns;
-        passNumber++;
     }
 
     return currentRuns.empty() ? Tabela(schema) : currentRuns[0];
@@ -225,7 +223,6 @@ void SortMergeJoin::performMergeJoin(const Tabela &sortedLeft, const Tabela &sor
     PageCursor Gs(&sortedRight);
     PageCursor Ts(&sortedRight);
 
-    int idx = 1;
     while (Tr.temMais() && Gs.temMais())
     {
         // 1. Enquanto Tri < Gsj, avança R
@@ -245,12 +242,11 @@ void SortMergeJoin::performMergeJoin(const Tabela &sortedLeft, const Tabela &sor
             break;
 
         // 3. Processa a partição (Tri == Gsj)
-        Ts = Gs;
-
+        PageCursor particaoInicio = Gs;
         while (Tr.temMais() && Gs.temMais() && Tr.getCurrent().get(idxLeft) == Gs.getCurrent().get(idxRight))
         {
 
-            Ts = Gs;
+            Ts = particaoInicio;
 
             while (Ts.temMais() && Ts.getCurrent().get(idxRight) == Tr.getCurrent().get(idxLeft))
             {
