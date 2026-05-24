@@ -86,18 +86,18 @@ Tabela SortMergeJoin::sortTable(Tabela *table, const std::string &joinCol)
 std::vector<Tabela> SortMergeJoin::generateRuns(Tabela *table, int colIndex)
 {
     std::vector<Tabela> runsGeradas;
-    std::vector<Pagina> paginas = table->fetchPages();
+    const int BUFFER_FRAMES = 5;
+    int totalPags = table->getQtdPags();
 
-    // Simula B=5 frames no buffer
-    for (size_t i = 0; i < paginas.size(); i += 5)
+    for (int i = 0; i < totalPags; i += BUFFER_FRAMES)
     {
         std::vector<Tupla> bufferFrames;
 
-        // Carrega ate 5 paginas no buffer
-        for (size_t j = 0; j < 5 && (i + j) < paginas.size(); ++j)
+        int pagesToLoad = std::min(BUFFER_FRAMES, totalPags - i);
+        for (int j = 0; j < pagesToLoad; j++)
         {
-            std::vector<Tupla> tuplasPag = paginas[i + j].fetchAll();
-            bufferFrames.insert(bufferFrames.end(), tuplasPag.begin(), tuplasPag.end());
+            const std::vector<Tupla> tuplasNaPag = table->fetchPage(i + j).fetchAll();
+            bufferFrames.insert(bufferFrames.end(), tuplasNaPag.begin(), tuplasNaPag.end());
         }
 
         // Ordenacao em memoria
