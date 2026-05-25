@@ -8,7 +8,7 @@ void Tabela::add(const Pagina &page)
 
 void Tabela::add(const Tupla &tuple)
 {
-    if (pags.empty() || pags.back().isFull())
+    if (pags.empty() || pags.back().isFull()) // Cria uma nova página se não há páginas ou se a última página está cheia
     {
         Pagina novaPagina;
         novaPagina.add(tuple);
@@ -16,6 +16,6 @@ void Tabela::add(const Tupla &tuple)
     }
     else
     {
-        pags.back().add(tuple);
+        pags.back().add(tuple); // Adiciona a tupla à última página existente
     }
 }

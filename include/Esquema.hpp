@@ -9,8 +9,8 @@ class Esquema
 {
 private:
     int qtdColunas;
-    std::map<std::string, int> nomeParaIndice;
-    std::vector<std::string> indiceparaNome; 
+    std::map<std::string, int> nomeParaIndice; // Mapeamento de nome de coluna para índice
+    std::vector<std::string> indiceparaNome; // Mapeamento de índice para nome de coluna
 
 public:
     Esquema() : qtdColunas(0) {}
